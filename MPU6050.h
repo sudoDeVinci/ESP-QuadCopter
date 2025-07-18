@@ -1,14 +1,23 @@
 #ifndef MPU6050_H
 #define MPU6050_H
 
+#include "sensor.h"
 #include <Wire.h>
 #include <array>
 #include <unordered_map>
+#include <vector>
+#include <mutex>
+#include <chrono>
 
 #define MPU6050_ADDRESS 0x68
 
 
-enum DLPF_CFG {
+/**
+ * Enumeration for Digital Low Pass Filter (DLPF)
+ * configuration registers addresses in hexadecimal.
+ * These determine the cutoff frequency for the low pass filter.
+ */
+const enum DLPF_CFG {
     DLPF_256HZ = 0x00,
     DLPF_188HZ = 0x01,
     DLPF_98HZ  = 0x02,
@@ -18,59 +27,64 @@ enum DLPF_CFG {
     DLPF_5HZ   = 0x06
 };
 
-enum LSB_SENSITIVITY {
+/**
+ * Enumeration for LSB sensitivity settings.
+ * These determine the sensitivity of the gyro readings,
+ * mapped to the corresponding register addresses in hexadecimal.
+ * The values are in degrees per second per LSB.
+ */
+const enum LSB_SENSITIVITY {
     LSB_131P0 = 0x00,
     LSB_65P5 = 0x08,
     LSB_32P8 = 0x10,
     LSB_16P4 = 0x18
 };
 
-std::unordered_map<LSB_SENSITIVITY, float> LSB_MAP = {
-    {LSB_SENSITIVITY::LSB_131P0, 131},
-    {LSB_SENSITIVITY::LSB_65P5, 65.5},
-    {LSB_SENSITIVITY::LSB_32P8, 32.8},
-    {LSB_SENSITIVITY::LSB_16P4, 16.4}
+/**
+ * Mapping of LSB sensitivity values to their corresponding sensitivity factors.
+ * This is used to convert raw gyro readings into meaningful values.
+ */
+const std::unordered_map<LSB_SENSITIVITY, float> LSB_MAP = {
+    {LSB_SENSITIVITY::LSB_131P0, 131.0f},
+    {LSB_SENSITIVITY::LSB_65P5, 65.5f},
+    {LSB_SENSITIVITY::LSB_32P8, 32.8f},
+    {LSB_SENSITIVITY::LSB_16P4, 16.4f}
+};
+
+/**
+ * Enumeration for MPU6050 register addresses.
+ * These are used to read and write data from/to the MPU6050 sensor.
+ */
+const enum MPU6050_REG {
+    GYRO_LPF = 0x1A,
+    GYRO_SENS = 0x1B,
+    PWR_MGMT_1 = 0x6B,
+    GYRO_XOUT_H = 0x43,
+    GYRO_XOUT_L = 0x44,
+    GYRO_YOUT_H = 0x45,
+    GYRO_YOUT_L = 0x46,
+    GYRO_ZOUT_H = 0x47,
+    GYRO_ZOUT_L = 0x48
 };
 
 using MPU_XYZ = std::array<float, 3>;
 
-struct MPU6050 {
+struct MPU6050 : public Sensor {
+private: 
+    static constexpr uint16_t MAX_SAMPLES = 500;
 
-    uint16_t address;
-    uint16_t clk;
+public:
     DLPF_CFG filter;
-    LSB_SENSITIVITY sensitivity;
+    float sensitivity;
     MPU_XYZ lastGyro;
-
-    /**
-     * Writes a single byte to the specified register.
-     * @param reg The register address to write to.
-     * @param value The byte value to write.
-     */
-    void writeToReg(uint8_t reg, uint8_t value) const {
-        Wire.beginTransmission(address);
-        Wire.write(reg);
-        Wire.write(value);
-        Wire.endTransmission();
-    }
-
-    /**
-     * Writes a single byte to the specified register without any values.
-     * This is useful for operations that only require a register address.
-     * @param reg The register address to write to.
-     */
-    void writeToReg(uint8_t reg) const {
-        Wire.beginTransmission(address);
-        Wire.write(reg);
-        Wire.endTransmission();
-    }
+    MPU_XYZ gyroOffsets = {0.0f, 0.0f, 0.0f};
 
     MPU6050(
         uint16_t address = MPU6050_ADDRESS,
         uint16_t clk = 400000,
         DLPF_CFG filter = DLPF_256HZ,
-        LSB_SENSITIVITY sensitivity = LSB_65P5
-    ) : address(address), clk(clk), filter(filter), sensitivity(sensitivity) {
+        LSB_SENSITIVITY lsb = LSB_65P5
+    ) : Sensor(address, clk) {
         Wire.setClock(clk);
         Wire.begin();
         delay(250);
@@ -82,44 +96,93 @@ struct MPU6050 {
         setLPF(filter);
 
         // set up sensitivity
-        setSensitivity(sensitivity);
+        setSensitivity(lsb);
     }
 
     void powerOn(void) const {
-        writeToReg(0x68, 0x00);
+        writeToReg(MPU6050_REG::PWR_MGMT_1, 0x00);
     }
 
     void setLPF(DLPF_CFG newFilter = DLPF_CFG::DLPF_10HZ) {
         this->filter = newFilter;
-        writeToReg(0x1A, static_cast<uint8_t>(newFilter));
+        writeToReg(MPU6050_REG::GYRO_LPF, static_cast<uint8_t>(newFilter));                         
     }
 
     void setSensitivity(LSB_SENSITIVITY newSensitivity = LSB_SENSITIVITY::LSB_65P5) {
-        this->sensitivity = newSensitivity;
-        writeToReg(0x1B, static_cast<uint8_t>(newSensitivity));
-
+        this->sensitivity = LSB_MAP.at(newSensitivity);
+        writeToReg(MPU6050_REG::GYRO_SENS, static_cast<uint8_t>(newSensitivity));
     }
 
-    MPU_XYZ readGyro() {
-        MPU_XYZ buffer;
+    /**
+     * Calibrates the gyro by averaging multiple samples.
+     * This method collects a specified number of samples and computes the average offsets for each axis.
+     * @param samples The number of samples to average for calibration.
+     */
+    void calibrateGyro(uint16_t samples = MAX_SAMPLES) {
+        this -> gyroOffsets = {0.0f, 0.0f, 0.0f};
+        MPU_XYZ offsets = this->readGyroSampled(samples);
+        this->gyroOffsets = offsets;
+    }
 
-        float scaleFactor = LSB_MAP[this->sensitivity];
+    /**
+     * Reads the gyro data from the MPU6050 sensor.
+     * This method reads raw gyro data from the sensor and applies sensitivity scaling and offsets.
+     * @return An MPU_XYZ containing the scaled gyro values for each axis.
+     */
+    MPU_XYZ readGyro() const{
+        MPU_XYZ buffer = {0.0f, 0.0f, 0.0f};
 
-        uint8_t reg = 0x43;
-        writeToReg(reg);
+        this->writeToReg(MPU6050_REG::GYRO_XOUT_H);
 
-        Wire.requestFrom(address, 6);
-        for (size_t i = 0; i < 3; ++i) {
-            if (Wire.available() >= 2) {
-                int16_t rawValue = (Wire.read() << 8) | Wire.read();
-                buffer[i] = rawValue / scaleFactor;
+        bool aquired = false;
+        {
+            UniqueTimedMutex lock(i2cMutex, std::defer_lock);
+            if (lock.try_lock_for(I2C_TIMEOUT_MS)) {
+                aquired = true;
+                Wire.requestFrom(this->address, 6);
+                for (size_t i = 0; i < 3; ++i) {
+                    if (Wire.available() >= 2) {
+                        int16_t rawValue = (Wire.read() << 8) | Wire.read();
+                        buffer[i] = (rawValue / this-> sensitivity) - this->gyroOffsets[i];
+                    }
+                }
             } else {
-                buffer[i] = 0;
+                aquired = false;
+                // TODO: Some logging - will handle later after base functionality is working
             }
         }
 
-        this->lastGyro = buffer;
         return buffer;
+    }
+
+    /**
+     * Reads multiple gyro samples and averages them.
+     * This method collects a specified number of samples and computes the average for each axis.
+     * @param samples The number of samples to average.
+     * @return An averaged MPU_XYZ containing the mean values for each axis.
+     */
+    MPU_XYZ readGyroSampled(uint16_t samples = MAX_SAMPLES) const {
+        samples = std::clamp(samples, 1, MAX_SAMPLES);
+        std::array<std::array<float, samples>, 3> gyroSamples = {0.0f};
+        for (int i = 0; i < samples; ++i) {
+            MPU_XYZ sample = readGyro();
+            for (size_t j = 0; j < 3; ++j) {
+                gyroSamples[j][i] = sample[j];
+            }
+            vTaskDelay(Sensor::I2C_DELAY_MS);
+        }
+
+        MPU_XYZ filteredGyro = {0.0f, 0.0f, 0.0f};
+        for (size_t i = 0; i < 3; ++i) {
+            std::array<float, 3> quartiles = this->quartiles(gyroSamples[i]);
+            float q1 = quartiles[0];
+            float q3 = quartiles[2];
+            float iqr = q3 - q1;
+            std::vector<float> filteredValues = this->removeOutliers(gyroSamples[i], q1, q3);
+            if (!filteredValues.empty()) filteredGyro[i] = mean(filteredValues);
+        }
+
+        return filteredGyro;
     }
 
 };
