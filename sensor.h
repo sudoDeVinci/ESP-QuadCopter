@@ -17,12 +17,13 @@ using UniqueTimedMutex = std::unique_lock<std::timed_mutex>;
  */
 struct Sensor {
 
-private:
-    mutable std::timed_mutex i2cMutex;
-    static constexpr std::chrono::milliseconds I2C_TIMEOUT_MS{100};
-    static constexpr TickType_t I2C_DELAY_MS = 5 / portTICK_PERIOD_MS;
+    private:
+        mutable std::timed_mutex i2cMutex;
+        static constexpr std::chrono::milliseconds I2C_TIMEOUT_MS{100};
+        static constexpr TickType_t I2C_DELAY_MS = 5 / portTICK_PERIOD_MS;
+        static constexpr TickType_t I2C_INIT_DELAY_MS = 250 / portTICK_PERIOD_MS;
 
-public:
+    public:
 
     /**The address of the sensor in hex.*/
     uint16_t address;
@@ -52,6 +53,7 @@ public:
                 // TODO: Some logging - will handle later after base functionality is working
             }
         }
+        aquired = false;
         vTaskDelay(I2C_DELAY_MS);
     }
 
@@ -74,6 +76,7 @@ public:
                 // TODO: Some logging - will handle later after base functionality is working
             }
         }
+        aquired = false;
         vTaskDelay(I2C_DELAY_MS);
     }
 

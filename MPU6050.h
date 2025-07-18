@@ -87,7 +87,7 @@ public:
     ) : Sensor(address, clk) {
         Wire.setClock(clk);
         Wire.begin();
-        delay(250);
+        vTaskDelay(I2C_INIT_DELAY_MS);
 
         // Turn on the device with no extra configs
         powerOn();
@@ -151,7 +151,7 @@ public:
                 // TODO: Some logging - will handle later after base functionality is working
             }
         }
-
+        aquired = false;
         return buffer;
     }
 
@@ -162,14 +162,13 @@ public:
      * @return An averaged MPU_XYZ containing the mean values for each axis.
      */
     MPU_XYZ readGyroSampled(uint16_t samples = MAX_SAMPLES) const {
-        samples = std::clamp(samples, 1, MAX_SAMPLES);
+        samples = std::clamp(samples, 30, MAX_SAMPLES);
         std::array<std::array<float, samples>, 3> gyroSamples = {0.0f};
         for (int i = 0; i < samples; ++i) {
             MPU_XYZ sample = readGyro();
             for (size_t j = 0; j < 3; ++j) {
                 gyroSamples[j][i] = sample[j];
             }
-            vTaskDelay(Sensor::I2C_DELAY_MS);
         }
 
         MPU_XYZ filteredGyro = {0.0f, 0.0f, 0.0f};
