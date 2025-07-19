@@ -87,7 +87,7 @@ public:
     ) : Sensor(address, clk) {
         Wire.setClock(clk);
         Wire.begin();
-        vTaskDelay(I2C_INIT_DELAY_MS);
+        vTaskDelay(Sensor::I2C_INIT_DELAY_MS);
 
         // Turn on the device with no extra configs
         powerOn();
@@ -134,11 +134,10 @@ public:
 
         this->writeToReg(MPU6050_REG::GYRO_XOUT_H);
 
-        bool aquired = false;
         {
-            UniqueTimedMutex lock(i2cMutex, std::defer_lock);
-            if (lock.try_lock_for(I2C_TIMEOUT_MS)) {
-                aquired = true;
+            UniqueTimedMutex lock(this->i2cMutex, std::defer_lock);
+            if (lock.try_lock_for(Sensor::I2C_TIMEOUT_MS)) {
+            
                 Wire.requestFrom(this->address, 6);
                 for (size_t i = 0; i < 3; ++i) {
                     if (Wire.available() >= 2) {
@@ -147,11 +146,10 @@ public:
                     }
                 }
             } else {
-                aquired = false;
                 // TODO: Some logging - will handle later after base functionality is working
             }
         }
-        aquired = false;
+        
         return buffer;
     }
 
@@ -162,12 +160,15 @@ public:
      * @return An averaged MPU_XYZ containing the mean values for each axis.
      */
     MPU_XYZ readGyroSampled(uint16_t samples = MAX_SAMPLES) const {
-        samples = std::clamp(samples, 30, MAX_SAMPLES);
-        std::array<std::array<float, samples>, 3> gyroSamples = {0.0f};
+        samples = std::clamp(samples, (uint16_t)30, MAX_SAMPLES);
+        std::array<std::vector<float>, 3> gyroSamples;
+        for (size_t i = 0; i < 3; ++i) {
+            gyroSamples[i].reserve(samples);
+        }
         for (int i = 0; i < samples; ++i) {
             MPU_XYZ sample = readGyro();
             for (size_t j = 0; j < 3; ++j) {
-                gyroSamples[j][i] = sample[j];
+                gyroSamples[j].push_back(sample[j]);
             }
         }
 

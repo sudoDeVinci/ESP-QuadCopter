@@ -19,11 +19,12 @@ struct Sensor {
 
     private:
         mutable std::timed_mutex i2cMutex;
+
+    public:
         static constexpr std::chrono::milliseconds I2C_TIMEOUT_MS{100};
         static constexpr TickType_t I2C_DELAY_MS = 5 / portTICK_PERIOD_MS;
         static constexpr TickType_t I2C_INIT_DELAY_MS = 250 / portTICK_PERIOD_MS;
 
-    public:
         /**The address of the sensor in hex.*/
         uint16_t address;
         /**The clock speed of the sensor in Hz.*/
@@ -40,7 +41,6 @@ struct Sensor {
         void writeToReg(uint8_t reg, uint8_t value) const {
             UniqueTimedMutex lock(i2cMutex, std::defer_lock);
             if (lock.try_lock_for(I2C_TIMEOUT_MS)) {
-                aquired = true;
                 Wire.beginTransmission(address);
                 Wire.write(reg);
                 Wire.write(value);
@@ -59,7 +59,6 @@ struct Sensor {
         void writeToReg(uint8_t reg) const {
             UniqueTimedMutex lock(i2cMutex, std::defer_lock);
             if (lock.try_lock_for(I2C_TIMEOUT_MS)) {
-                aquired = true;
                 Wire.beginTransmission(address);
                 Wire.write(reg);
                 Wire.endTransmission();
