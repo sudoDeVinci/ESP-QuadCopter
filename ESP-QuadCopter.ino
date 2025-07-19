@@ -6,5 +6,9 @@ void setup() {
     vTaskDelay(10 / portTICK_PERIOD_MS);
 
     MPU6050 gyroscope(0x68, 400000);
-    gyroscope.initialize();
+}
+
+void loop() {
+    // Empty loop for now
+    vTaskDelay(1000 / portTICK_PERIOD_MS);
 }
