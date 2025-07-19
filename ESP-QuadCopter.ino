@@ -6,5 +6,5 @@ void setup() {
     vTaskDelay(10 / portTICK_PERIOD_MS);
 
     MPU6050 gyroscope(0x68, 400000);
-    mpu.initialize();
+    gyroscope.initialize();
 }
