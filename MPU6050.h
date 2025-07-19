@@ -17,7 +17,7 @@
  * configuration registers addresses in hexadecimal.
  * These determine the cutoff frequency for the low pass filter.
  */
-const enum DLPF_CFG {
+enum DLPF_CFG {
     DLPF_256HZ = 0x00,
     DLPF_188HZ = 0x01,
     DLPF_98HZ  = 0x02,
@@ -33,7 +33,7 @@ const enum DLPF_CFG {
  * mapped to the corresponding register addresses in hexadecimal.
  * The values are in degrees per second per LSB.
  */
-const enum LSB_SENSITIVITY {
+enum LSB_SENSITIVITY {
     LSB_131P0 = 0x00,
     LSB_65P5 = 0x08,
     LSB_32P8 = 0x10,
@@ -55,7 +55,7 @@ const std::unordered_map<LSB_SENSITIVITY, float> LSB_MAP = {
  * Enumeration for MPU6050 register addresses.
  * These are used to read and write data from/to the MPU6050 sensor.
  */
-const enum MPU6050_REG {
+enum MPU6050_REG {
     GYRO_LPF = 0x1A,
     GYRO_SENS = 0x1B,
     PWR_MGMT_1 = 0x6B,
@@ -81,7 +81,7 @@ public:
 
     MPU6050(
         uint16_t address = MPU6050_ADDRESS,
-        uint16_t clk = 400000,
+        uint32_t clk = 400000,
         DLPF_CFG filter = DLPF_256HZ,
         LSB_SENSITIVITY lsb = LSB_65P5
     ) : Sensor(address, clk) {
