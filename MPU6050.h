@@ -177,7 +177,6 @@ public:
             std::array<float, 3> quartiles = this->quartiles(gyroSamples[i]);
             float q1 = quartiles[0];
             float q3 = quartiles[2];
-            float iqr = q3 - q1;
             std::vector<float> filteredValues = this->removeOutliers(gyroSamples[i], q1, q3);
             if (!filteredValues.empty()) filteredGyro[i] = mean(filteredValues);
         }

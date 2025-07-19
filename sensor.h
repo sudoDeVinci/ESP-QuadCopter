@@ -129,6 +129,23 @@ struct Sensor {
         }
 
         /**
+         * Find the quartiles of an array of numerical type T.
+         * @param vec The array of type T with size N.
+         * @return An array containing the first quartile, median, and third quartile.
+         */
+        template <typename T>
+        std::array<float, 3> quartiles(std::vector<T> &vec) const {
+            std::sort(vec.begin(), vec.end());
+            size_t N = vec.size();
+            float q1 = vec[N / 4];
+            float q3 = vec[(3 * N) / 4];
+            float median = vec[N / 2];
+            
+            std::array<float, 3> quartiles = {q1, median, q3};
+            return quartiles;
+        }
+
+        /**
          * Remove outliers from an array of numerical type T using the IQR method.
          * @param arr The array of type T.
          * @param q1 The first quartile.
@@ -150,6 +167,33 @@ struct Sensor {
             for (size_t i = 0; i < N; ++i) {
                 if (arr[i] >= lower_bound && arr[i] <= upper_bound) {
                     filtered.push_back(arr[i]);
+                }
+            }
+            return filtered;
+        }
+
+        /**
+         * Remove outliers from a vector of numerical type T using the IQR method.
+         * @param vec The vector of type T.
+         * @param q1 The first quartile.
+         * @param q3 The third quartile.
+         * @return A vector containing the filtered values without outliers.
+         */
+        template <typename T>
+        std::vector<T> removeOutliers(
+            const std::vector<T> &vec,
+            float q1,
+            float q3
+        ) const {
+            float iqr = q3 - q1;
+            float lower_bound = q1 - 1.5 * iqr;
+            float upper_bound = q3 + 1.5 * iqr;
+
+            std::vector<T> filtered;
+            filtered.reserve(vec.size());
+            for (const T& value : vec) {
+                if (value >= lower_bound && value <= upper_bound) {
+                    filtered.push_back(value);
                 }
             }
             return filtered;
