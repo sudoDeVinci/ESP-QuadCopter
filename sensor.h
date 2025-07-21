@@ -12,8 +12,10 @@
 using UniqueTimedMutex = std::unique_lock<std::timed_mutex>;
 
 /**
- * Base class for sensors.
- * Provides type-agnostic common functionality for sensor operations.
+ * Base class for I2C sensors.
+ * Designed to be used with the ESP32 platform and the Arduino framework.
+ * It includes methods for writing to registers, calculating statistics, and handling outliers.
+ * Meant to be thread-safe with a timed mutex for I2C communication.
  */
 struct Sensor {
 

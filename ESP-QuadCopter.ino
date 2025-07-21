@@ -1,6 +1,7 @@
 #include "MPU6050.h"
 #include <Arduino.h>
 
+
 // Create custom TwoWire instances for different I2C buses
 TwoWire I2C_1 = TwoWire(0);  // I2C bus 0
 TwoWire I2C_2 = TwoWire(1);  // I2C bus 1
