@@ -29,9 +29,11 @@ struct Sensor {
         uint16_t address;
         /**The clock speed of the sensor in Hz.*/
         uint32_t clk;
+        /**Reference to the TwoWire instance to use for I2C communication.*/
+        TwoWire& wire;
 
-        Sensor(uint16_t address, uint32_t clk)
-            : address(address), clk(clk) {}
+        Sensor(uint16_t address, uint32_t clk, TwoWire& wireInstance = Wire)
+            : address(address), clk(clk), wire(wireInstance) {}
 
         /**
          * Writes a single byte to the specified register.
@@ -41,10 +43,10 @@ struct Sensor {
         void writeToReg(uint8_t reg, uint8_t value) const {
             UniqueTimedMutex lock(i2cMutex, std::defer_lock);
             if (lock.try_lock_for(I2C_TIMEOUT_MS)) {
-                Wire.beginTransmission(address);
-                Wire.write(reg);
-                Wire.write(value);
-                Wire.endTransmission();
+                wire.beginTransmission(address);
+                wire.write(reg);
+                wire.write(value);
+                wire.endTransmission();
             } else {
                 // TODO: Some logging - will handle later after base functionality is working
             }
@@ -59,9 +61,9 @@ struct Sensor {
         void writeToReg(uint8_t reg) const {
             UniqueTimedMutex lock(i2cMutex, std::defer_lock);
             if (lock.try_lock_for(I2C_TIMEOUT_MS)) {
-                Wire.beginTransmission(address);
-                Wire.write(reg);
-                Wire.endTransmission();
+                wire.beginTransmission(address);
+                wire.write(reg);
+                wire.endTransmission();
             } else {
                 // TODO: Some logging - will handle later after base functionality is working
             }

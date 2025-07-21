@@ -83,10 +83,21 @@ public:
         uint16_t address = MPU6050_ADDRESS,
         uint32_t clk = 400000,
         DLPF_CFG filter = DLPF_256HZ,
-        LSB_SENSITIVITY lsb = LSB_65P5
-    ) : Sensor(address, clk) {
-        Wire.setClock(clk);
-        Wire.begin();
+        LSB_SENSITIVITY lsb = LSB_65P5,
+        bool autoInit = true,
+        TwoWire& wireInstance = Wire
+    ) : Sensor(address, clk, wireInstance) {
+        if (autoInit) {
+            initialize(filter, lsb);
+        } else {
+            this->filter = filter;
+            this->sensitivity = LSB_MAP.at(lsb);
+        }
+    }
+
+    void initialize(DLPF_CFG filter = DLPF_256HZ, LSB_SENSITIVITY lsb = LSB_65P5) {
+        wire.setClock(clk);
+        wire.begin();
         vTaskDelay(Sensor::I2C_INIT_DELAY_MS);
 
         // Turn on the device with no extra configs
@@ -138,10 +149,10 @@ public:
             UniqueTimedMutex lock(this->i2cMutex, std::defer_lock);
             if (lock.try_lock_for(Sensor::I2C_TIMEOUT_MS)) {
             
-                Wire.requestFrom(this->address, 6);
+                wire.requestFrom(this->address, 6);
                 for (size_t i = 0; i < 3; ++i) {
-                    if (Wire.available() >= 2) {
-                        int16_t rawValue = (Wire.read() << 8) | Wire.read();
+                    if (wire.available() >= 2) {
+                        int16_t rawValue = (wire.read() << 8) | wire.read();
                         buffer[i] = (rawValue / this-> sensitivity) - this->gyroOffsets[i];
                     }
                 }
