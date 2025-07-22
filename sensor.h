@@ -233,3 +233,5 @@ struct Sensor {
             return filtered;
         }
 };
+
+#endif
