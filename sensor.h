@@ -103,21 +103,49 @@ struct Sensor {
 
         /**
          * Find the standard deviation of an array of numerical type T.
+         * @tparam T The type of the elements in the array.
+         * @tparam N The size of the array.
          * @param arr The array of type T with size N.
+         * @param meanValue The mean value to use for the calculation. If NaN, it will be calculated from the array.
          * @return The standard deviation of the array.
          */
         template <typename T, size_t N>
-        float stddev(const std::array<T, N> &arr) const {
-            float meanValue = mean(arr, N);
-            long sum = 0;
+        float stddev(const std::array<T, N> &arr, const float meanValue = NAN) const {
+            float mval = std::isnan(meanValue) ? mean(arr) : meanValue;
+            if (N == 0) return 0.0f;
+
+            float sum = 0.0f;
             for (size_t i = 0; i < N; ++i) {
-                sum += (arr[i] - meanValue) * (arr[i] - meanValue);
+                sum += (arr[i] - mval) * (arr[i] - mval);
             }
             return sqrt(sum / (float)N);
         }
 
         /**
+         * Find the standard deviation of a vector of numerical type T.
+         * NOTE: If the meanValue is NaN, it will be calculated from the vector.
+         * @tparam T The type of the elements in the vector.
+         * @param vec The vector of type T.
+         * @param meanValue The mean value to use for the calculation. If NaN, it will be calculated from the array.
+         * @return The standard deviation of the vector.
+         */
+        template <typename T>
+        float stddev(const std::vector<T> &vec, const float meanValue = NAN) const {
+            float mval = std::isnan(meanValue) ? mean(vec) : meanValue;
+            if (vec.empty()) return 0.0f;
+
+            float sum = 0.0f;
+            for (const T& num : vec) {
+                sum += (num - mval) * (num - mval);
+            }
+            return sqrt(sum / (float)vec.size());
+        }
+
+        /**
          * Find the quartiles of an array of numerical type T.
+         * NOTE: This function mutates the input array by sorting it.
+         * @tparam T The type of the elements in the array.
+         * @tparam N The size of the array.
          * @param arr The array of type T with size N.
          * @return An array containing the first quartile, median, and third quartile.
          */
@@ -134,6 +162,8 @@ struct Sensor {
 
         /**
          * Find the quartiles of an array of numerical type T.
+         * NOTE: This function mutates the input array by sorting it.
+         * @tparam T The type of the elements in the array.
          * @param vec The array of type T with size N.
          * @return An array containing the first quartile, median, and third quartile.
          */
@@ -203,6 +233,3 @@ struct Sensor {
             return filtered;
         }
 };
-
-
-#endif
