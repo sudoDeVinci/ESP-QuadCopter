@@ -1,4 +1,4 @@
-#include "MPU6050.h"
+#include "MPU6050.hpp"
 #include <Arduino.h>
 
 

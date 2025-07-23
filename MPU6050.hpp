@@ -1,7 +1,7 @@
 #ifndef MPU6050_H
 #define MPU6050_H
 
-#include "sensor.h"
+#include "sensor.hpp"
 #include <Wire.h>
 #include <array>
 #include <unordered_map>
@@ -95,10 +95,17 @@ public:
         }
     }
 
-    void initialize(DLPF_CFG filter = DLPF_256HZ, LSB_SENSITIVITY lsb = LSB_65P5) {
-        wire.setClock(clk);
-        wire.begin();
-        vTaskDelay(Sensor::I2C_INIT_DELAY_MS);
+    /**
+     * Initializes the MPU6050 sensor with the specified filter and sensitivity.
+     * This method sets the clock speed, begins I2C communication, and applies initial configurations.
+     * @param filter The digital low pass filter configuration to apply.
+     * @param lsb The sensitivity setting for the gyro.
+     */
+    bool initialize(DLPF_CFG filter = DLPF_256HZ, LSB_SENSITIVITY lsb = LSB_65P5) {
+        if (!begin()) {
+            Serial.println("Failed to initialize MPU6050");
+            return false;
+        }
 
         // Turn on the device with no extra configs
         powerOn();
@@ -108,17 +115,33 @@ public:
 
         // set up sensitivity
         setSensitivity(lsb);
+
+        return true;
     }
 
+    /**
+     * Powers on the MPU6050 sensor.
+     * This method writes to the PWR_MGMT_1 register to wake up the sensor.
+     */
     void powerOn(void) const {
         writeToReg(MPU6050_REG::PWR_MGMT_1, 0x00);
     }
 
+    /**
+     * Sets the digital low pass filter (DLPF) configuration.
+     * This method updates the filter setting and writes it to the sensor's register.
+     * @param newFilter The new DLPF configuration to apply.
+     */
     void setLPF(DLPF_CFG newFilter = DLPF_CFG::DLPF_10HZ) {
         this->filter = newFilter;
         writeToReg(MPU6050_REG::GYRO_LPF, static_cast<uint8_t>(newFilter));                         
     }
 
+    /**
+     * Sets the sensitivity of the gyro.
+     * This method updates the sensitivity value and writes it to the sensor's register.
+     * @param newSensitivity The new sensitivity setting to apply.
+     */
     void setSensitivity(LSB_SENSITIVITY newSensitivity = LSB_SENSITIVITY::LSB_65P5) {
         this->sensitivity = LSB_MAP.at(newSensitivity);
         writeToReg(MPU6050_REG::GYRO_SENS, static_cast<uint8_t>(newSensitivity));

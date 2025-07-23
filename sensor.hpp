@@ -26,7 +26,10 @@ struct Sensor {
         static constexpr TickType_t I2C_INIT_DELAY_MS = 250 / portTICK_PERIOD_MS;
 
     public:
-
+        /**The SDA pin for the I2C bus.*/
+        uint8_t SDA;
+        /**The SCL pin for the I2C bus.*/
+        uint8_t SCL;
         /**The address of the sensor in hex.*/
         uint16_t address;
         /**The clock speed of the sensor in Hz.*/
@@ -34,8 +37,21 @@ struct Sensor {
         /**Reference to the TwoWire instance to use for I2C communication.*/
         TwoWire& wire;
 
-        Sensor(uint16_t address, uint32_t clk, TwoWire& wireInstance = Wire)
-            : address(address), clk(clk), wire(wireInstance) {}
+        Sensor(
+            uint8_t sda,
+            uint8_t scl,
+            uint16_t address,
+            uint32_t clk,
+            TwoWire& wireInstance = Wire
+        )
+            : SDA(sda), SCL(scl), address(address), clk(clk), wire(wireInstance) {}
+
+        bool begin(void) {
+            if not (wire.setClock(clk)) return false;
+            if not (wire.begin(sda, scl)) return false;
+            vTaskDelay(I2C_INIT_DELAY_MS);
+            return true;
+        }
 
         /**
          * Writes a single byte to the specified register.
@@ -70,6 +86,48 @@ struct Sensor {
                 // TODO: Some logging - will handle later after base functionality is working
             }
             vTaskDelay(I2C_DELAY_MS);
+        }
+        
+        /**
+         * Writes a command to the sensor.
+         * The command is a 16-bit value split into two bytes.
+         * @param cmd The command to write, represented as a 16-bit unsigned integer.
+         */
+        void writeCommand(uint16_t cmd) const {
+            std::array<uint8_t, 2> cmdBytes = {
+                static_cast<uint8_t>(cmd >> 8), // High byte
+                static_cast<uint8_t>(cmd & 0xFF) // Low byte
+            };
+
+            UniqueTimedMutex lock(i2cMutex, std::defer_lock);
+            if (lock.try_lock_for(I2C_TIMEOUT_MS)) {
+                wire.beginTransmission(this->address);
+                wire.write(cmdBytes.data(), cmdBytes.size());
+                wire.endTransmission();
+            } else {
+                // TODO: Some logging - will handle later after base functionality is working
+            }
+
+            vTaskDelay(I2C_DELAY_MS);
+        }
+
+        /**
+         * Performs a CRC8 calculation on the supplied values.
+         * @param data  Pointer to the data to use when calculating the CRC8.
+         * @param len   The number of bytes in 'data'.
+         * @return The computed CRC8 value.
+         */
+        uint8_t crc8(const uint8_t *data, int len) const {
+            const uint8_t POLYNOMIAL(0x31);
+            uint8_t crc(0xFF);
+
+            for (int j = len; j; --j) {
+                crc ^= *data++;
+                for (int i = 8; i; --i) {
+                    crc = (crc & 0x80) ? (crc << 1) ^ POLYNOMIAL : (crc << 1);
+                }
+            }
+            return crc;
         }
 
         /**
@@ -233,5 +291,6 @@ struct Sensor {
             return filtered;
         }
 };
+
 
 #endif
